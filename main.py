@@ -1,59 +1,69 @@
 import os
+from datetime import datetime
+from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from crewai import Agent, Task, Crew
+from crewai_tools import FileWriterTool
 
-# 1. 내가 발급받은 제미나이 열쇠(API Key)를 입력하는 곳입니다.
-# 아까 복사해둔 API 키를 아래 큰따옴표 안에 붙여넣으세요.
-os.environ["GEMINI_API_KEY"] = "AIzaSyC1UqJuaqKEmIP50oU8GNT3wlQgrsyHZXw"
-
-# 2. 어떤 두뇌를 쓸지 결정합니다. (가장 빠르고 가성비 좋은 제미나이 2.0 Flash 모델 사용)
+# 1. API 키 및 두뇌 세팅
+load_dotenv() 
 gemini_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
-# 2. 기획자 AI 만들기
+
+# 2. 아이디어 입력받기
+print("==================================================")
+print("🤖 AI 개발 팀이 대기 중입니다!")
+my_idea = input("💡 만들고 싶은 프로그램 아이디어를 자유롭게 적어주세요:\n👉 ")
+print("==================================================")
+
+# 3. 프로젝트 폴더 자동 생성
+current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+project_folder = f"my_project_{current_time}"
+os.makedirs(project_folder, exist_ok=True) 
+
+# 4. 파일 쓰기 도구 (경로 제한을 풀고 프롬프트로 제어합니다)
+file_writer_tool = FileWriterTool()
+
+# 5. 에이전트 생성 (족쇄 채우기)
 planner = Agent(
-    role="서비스 기획자",
-    goal="사용자의 아이디어를 바탕으로 완벽한 기획서 작성",
-    backstory="너는 실리콘밸리 10년 차 기획자야. 개발자가 바로 코딩할 수 있도록 마크다운 형식으로 논리적이고 깔끔하게 기획서를 작성해.",
+    role="시스템 아키텍트",
+    goal="아이디어를 바탕으로 완벽한 기획서 및 파일 구조 설계",
+    backstory=f"너는 소프트웨어 아키텍트야. 모든 코드는 반드시 '{project_folder}' 폴더 안에만 존재해야 해. [🚨절대 주의] 게임을 실행하는 메인 파일의 이름은 절대 'main.py'로 짓지 마! 기존 시스템과 충돌하니까 무조건 'game_app.py'라는 이름으로 설계해.",
     llm=gemini_llm,
-    verbose=True,
-    max_rpm=3  # 👈 [추가된 부분] 1분에 최대 10번만 질문하도록 속도를 늦춥니다.
+    verbose=True
 )
 
-# 3. 개발자 AI 만들기
 developer = Agent(
-    role="파이썬 개발자",
-    goal="기획서를 바탕으로 에러 없이 실행 가능한 파이썬 코드 작성",
-    backstory="너는 꼼꼼한 성격을 가진 천재 파이썬 개발자야. 기획서의 내용을 하나도 빠짐없이 실제 파이썬 코드로 구현해내.",
+    role="파이썬 수석 개발자",
+    goal="기획서를 바탕으로 코드를 작성하고 도구를 사용해 실제 파일로 저장",
+    backstory=f"너는 코드를 물리적 파일로 저장하는 개발자야. [🚨절대 규칙] FileWriterTool을 사용할 때 `filename` 속성에는 무조건 '{project_folder}/파일명.py' 형태로 앞에 폴더명을 붙여야 해! 그리고 `overwrite=True` 속성도 무조건 같이 넣어줘야 에러가 안 나!",
     llm=gemini_llm,
-    verbose=True,
-    max_rpm=3  # 👈 [추가된 부분] 개발자도 천천히 일하도록 제한합니다.
+    tools=[file_writer_tool],
+    verbose=True
 )
 
-# 4. 우리가 만들고 싶은 것 (아이디어만 던져주면 됩니다!)
-my_idea = "컴퓨터가 1부터 100까지 숫자 중 하나를 무작위로 생각하고, 내가 숫자를 입력하면 '업'인지 '다운'인지 알려주어 정답을 맞추는 게임을 만들어줘."
-
-# 5. 작업(Task) 지시서 작성
+# 6. 작업(Task) 지시서 작성
 plan_task = Task(
-    description=f"다음 아이디어를 분석해서 상세한 기능 요구사항 기획서를 작성해: {my_idea}",
-    expected_output="마크다운 형식의 상세 기획서",
+    description=f"다음 아이디어를 분석해서 기획서와 필요한 파이썬 파일 목록을 작성해: {my_idea}",
+    expected_output="상세 기획서와 필요한 .py 파일들의 목록 (메인 실행 파일 이름은 game_app.py)",
     agent=planner
 )
 
 code_task = Task(
-    description="기획자가 작성한 기획서를 바탕으로 완벽하게 동작하는 파이썬 코드를 작성해. 코드 블록 안에 주석을 꼼꼼히 달아줘.",
-    expected_output="실행 가능한 파이썬 코드",
+    description=f"기획안을 바탕으로 파이썬 코드를 작성하고, 제공된 도구를 사용해 파일을 생성해. 도구 사용 예시: filename='{project_folder}/game_app.py', overwrite=True. 모든 파일 생성이 끝나면 완료를 보고해.",
+    expected_output="모든 파일 생성이 완료되었다는 메시지와 게임 실행 방법",
     agent=developer
 )
 
-# 6. AI 팀(Crew) 결성 및 업무 시작!
+# 7. AI 팀(Crew) 결성 및 시작
 my_crew = Crew(
     agents=[planner, developer],
     tasks=[plan_task, code_task],
-    verbose=True  # AI들이 서로 협력하며 일하는 과정을 터미널에 실시간으로 중계합니다.
+    verbose=True
 )
 
-print("기획자와 개발자 AI가 작업을 시작합니다! (터미널 창을 지켜보세요...)")
+print(f"\n🚀 기획자와 개발자가 작업을 시작합니다! (모든 파일은 '{project_folder}' 폴더에 저장됩니다...)")
 result = my_crew.kickoff()
 
-print("\n==============================================")
-print("최종 결과물:")
-print(result)
+print("\n==================================================")
+print(f"✅ 최종 결과물 완료! 좌측 파일 목록에서 '{project_folder}' 폴더를 열어보세요!")
+print("==================================================")
