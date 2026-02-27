@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>동화 덱빌딩 PVE 게임</title>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+<script>
+    function startGame() {
+        // 더블 클릭 방지
+        document.getElementById("startButton").disabled = true;
+        document.getElementById("loadingIndicator").style.display = "block";
+
+        fetch('/start_game', { method: 'POST' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.body.innerHTML = data; // 응답으로 전체 body를 교체
+            })
+            .catch(error => {
+                console.error('There has been a problem with your fetch operation:', error);
+                document.getElementById("startButton").disabled = false;
+                document.getElementById("loadingIndicator").style.display = "none";
+                alert("게임 시작 중 오류가 발생했습니다.");
+            });
+    }
+</script>
+</head>
+<body>
+
+<div class="container">
+  <h1>동화 덱빌딩 PVE 게임</h1>
+  <p>아기자기한 동화 캐릭터와 함께 덱을 구성하고, 흥미진진한 PVE 전투를 즐겨보세요!</p>
+  <button class="button" id="startButton" onclick="startGame()" {% if loading %}disabled{% endif %}>게임 시작</button>
+    <div id="loadingIndicator" style="display:none;">로딩 중...</div>
+
+  <div class="card-container">
+        <div class="card">
+            <div class="card-image"><img src="{{ url_for('static', filename='images/snow_white.png') }}" alt="백설공주"></div>
+            <div class="card-title">백설공주</div>
+            <div class="card-description">사과를 사용하여 적을 약화시킵니다.</div>
+        </div>
+        <div class="card">
+            <div class="card-image"><img src="{{ url_for('static', filename='images/cinderella.png') }}" alt="신데렐라"></div>
+            <div class="card-title">신데렐라</div>
+            <div class="card-description">유리 구두로 아군을 강화합니다.</div>
+        </div>
+        <div class="card">
+            <div class="card-image"><img src="{{ url_for('static', filename='images/red_riding_hood.png') }}" alt="빨간망토"></div>
+            <div class="card-title">빨간망토</div>
+            <div class="card-description">늑대를 물리치고 강력한 공격을 합니다.</div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,87 @@
+import os
+from datetime import datetime
+from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
+from crewai import Agent, Task, Crew
+from crewai.tools import tool # 👈 [수정] 외부 도구 대신 커스텀 도구를 만들기 위한 부품을 가져옵니다.
+
+# 1. API 키 및 두뇌 세팅
+load_dotenv() 
+gemini_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+
+# 2. 아이디어 입력받기
+print("==================================================")
+print("🤖 AI 개발 팀이 대기 중입니다!")
+my_idea = input("💡 만들고 싶은 프로그램 아이디어를 자유롭게 적어주세요:\n👉 ")
+print("==================================================")
+
+# 3. 프로젝트 폴더 자동 생성
+current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+project_folder = f"my_project_{current_time}"
+os.makedirs(project_folder, exist_ok=True) 
+
+# 💡 4. [핵심 해결] 100% 작동하는 나만의 '무적 파일 생성 도구' 만들기
+# 💡 4. [완벽 버전] 하위 폴더까지 알아서 생성해 주는 스마트 파일 생성 도구
+@tool("File Writer Tool")
+def write_file_tool(filename: str, content: str) -> str:
+    """이 도구는 완성된 코드를 실제 파일로 저장합니다. 파일 이름(filename)과 코드 내용(content)을 입력하세요."""
+    
+    # 1. 파일이 저장될 최종 절대 경로를 계산합니다.
+    file_path = os.path.abspath(os.path.join(project_folder, filename))
+    
+    # 2. [보안] AI가 '../' 등을 써서 바탕화면 등 엉뚱한 곳에 파일을 만드는 것을 차단합니다.
+    if not file_path.startswith(os.path.abspath(project_folder)):
+        return "Error: 프로젝트 폴더 외부로는 파일을 생성할 수 없습니다."
+        
+    # 3. AI가 'templates/index.html' 처럼 폴더 경로를 줬다면, 해당 폴더부터 먼저 생성합니다.
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    
+    # 4. 파일을 안전하게 작성합니다.
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return f"[{filename}] 파일이 폴더에 성공적으로 생성되었습니다!"
+
+# 5. 에이전트 생성
+planner = Agent(
+    role="시스템 아키텍트",
+    goal="아이디어를 바탕으로 완벽한 기획서 및 파일 구조 설계",
+    backstory="너는 10년 차 소프트웨어 아키텍트야. 모든 파일을 하위 폴더 없이 단일 폴더에 넣는 구조로 설계해. 메인 게임 실행 파일 이름은 무조건 'game_app.py'로 해.",
+    llm=gemini_llm,
+    verbose=True
+)
+
+developer = Agent(
+    role="파이썬 수석 개발자",
+    goal="기획서를 바탕으로 코드를 작성하고 제공된 도구를 사용해 실제 파일로 저장",
+    backstory="너는 코드를 짜고 물리적 파일로 저장하는 수석 개발자야. 'File Writer Tool'을 반복적으로 사용해서 기획서에 있는 모든 파일을 하나씩 전부 만들어내야 해. 코드를 절대 터미널에 텍스트로 출력하지 말고, 오직 도구만을 사용해서 파일로 저장해.",
+    llm=gemini_llm,
+    tools=[write_file_tool], # 👈 [수정] 방금 우리가 직접 만든 무적의 도구를 장착!
+    verbose=True
+)
+
+# 6. 작업(Task) 지시서 작성
+plan_task = Task(
+    description=f"다음 아이디어를 분석해서 기획서와 필요한 파이썬 파일 목록을 작성해: {my_idea}",
+    expected_output="상세 기획서와 필요한 .py 파일들의 목록 (메인 실행 파일 이름은 game_app.py)",
+    agent=planner
+)
+
+code_task = Task(
+    description="기획안을 바탕으로 파이썬 코드를 작성하고, 제공된 도구를 사용해 모든 파일을 실제로 생성해. 모든 파일 생성이 끝나면 완료를 보고해.",
+    expected_output="모든 파일 생성이 완료되었다는 메시지와 게임 실행 방법",
+    agent=developer
+)
+
+# 7. AI 팀(Crew) 결성 및 시작
+my_crew = Crew(
+    agents=[planner, developer],
+    tasks=[plan_task, code_task],
+    verbose=True
+)
+
+print(f"\n🚀 기획자와 개발자가 작업을 시작합니다! (모든 파일은 '{project_folder}' 폴더에 저장됩니다...)")
+result = my_crew.kickoff()
+
+print("\n==================================================")
+print(f"✅ 최종 결과물 완료! 좌측 파일 목록에서 '{project_folder}' 폴더를 열어보세요!")
+print("==================================================")

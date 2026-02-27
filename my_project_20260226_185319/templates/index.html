@@ -1,0 +1,14 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>동화 대전</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>동화 대전</h1>
+    <p>덱을 구성하고 PVE 스테이지를 클리어하세요!</p>
+    <a href="/battle">전투 시작</a>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
